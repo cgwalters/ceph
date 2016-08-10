@@ -595,6 +595,8 @@ protected:
 
   inodeno_t get_root_ino();
   Inode *get_root();
+  bool is_root(const Inode *in) const { return in == root; }
+  bool is_root(InodeRef &in) const { return is_root(in.get()); }
 
   int init()  WARN_UNUSED_RESULT;
   void shutdown();
