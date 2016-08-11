@@ -1408,3 +1408,49 @@ TEST(LibCephFS, Nlink) {
 
   ceph_shutdown(cmount);
 }
+
+TEST(LibCephFS, SlashDotDot) {
+  struct ceph_mount_info *cmount;
+  ASSERT_EQ(ceph_create(&cmount, NULL), 0);
+  ASSERT_EQ(ceph_conf_read_file(cmount, NULL), 0);
+  ASSERT_EQ(0, ceph_conf_parse_env(cmount, NULL));
+  ASSERT_EQ(ceph_mount(cmount, "/"), 0);
+
+  struct stat	st;
+  ASSERT_EQ(ceph_stat(cmount, "/.", &st), 0);
+
+  ino_t ino = st.st_ino;
+  ASSERT_EQ(ceph_stat(cmount, "/..", &st), 0);
+
+  /* At root, "." and ".." should be the same inode */
+  ASSERT_EQ(ino, st.st_ino);
+
+
+  /* Make sure it works same way when mounting subtree */
+  char dir1[32], dir2[32];
+  sprintf(dir1, "/sldotdot%x", getpid());
+  sprintf(dir2, "%s/sub%x", dir1, getpid());
+
+  ASSERT_EQ(ceph_mkdir(cmount, dir1, 0755), 0);
+  ASSERT_EQ(ceph_mkdir(cmount, dir2, 0755), 0);
+  ASSERT_EQ(ceph_unmount(cmount), 0);
+  ASSERT_EQ(ceph_mount(cmount, dir2), 0);
+  ASSERT_EQ(ceph_stat(cmount, "/.", &st), 0);
+  ino = st.st_ino;
+  ASSERT_EQ(ceph_stat(cmount, "/..", &st), 0);
+  ASSERT_EQ(ino, st.st_ino);
+
+  /* Test readdir behavior */
+  struct ceph_dir_result *rdir;
+  ASSERT_EQ(ceph_opendir(cmount, "/", &rdir), 0);
+  struct dirent *result = ceph_readdir(cmount, rdir);
+  ASSERT_TRUE(result != NULL);
+  ASSERT_STREQ(result->d_name, ".");
+  ino = result->d_ino;
+  result = ceph_readdir(cmount, rdir);
+  ASSERT_TRUE(result != NULL);
+  ASSERT_STREQ(result->d_name, "..");
+  ASSERT_EQ(ino, result->d_ino);
+
+  ceph_shutdown(cmount);
+}
