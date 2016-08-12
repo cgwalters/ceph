@@ -1341,7 +1341,10 @@ int RGWSubUserPool::execute_remove(RGWUserAdminOpState& op_state,
 
   map<std::string, RGWSubUser>::iterator siter;
   siter = subuser_map->find(subuser_str);
-
+  if (siter == subuser_map->end()){
+    set_err_msg(err_msg, "subuser not found: " + subuser_str);
+    return -EINVAL;
+  }
   if (!op_state.has_existing_subuser()) {
     set_err_msg(err_msg, "subuser not found: " + subuser_str);
     return -EINVAL;
@@ -2483,7 +2486,11 @@ public:
           time_t mtime, JSONObj *obj, sync_type_t sync_mode) {
     RGWUserInfo info;
 
-    decode_json_obj(info, obj);
+    try {
+      decode_json_obj(info, obj);
+    } catch (JSONDecoder::err& e) {
+      return -EINVAL;
+    }
 
     RGWUserInfo old_info;
     time_t orig_mtime;

@@ -7707,6 +7707,10 @@ void ReplicatedPG::handle_watch_timeout(WatchRef watch)
   ObjectContextRef obc = watch->get_obc(); // handle_watch_timeout owns this ref
   dout(10) << "handle_watch_timeout obc " << obc << dendl;
 
+  if (!is_active()) {
+    dout(10) << "handle_watch_timeout not active, no-op" << dendl;
+    return;
+  }
   if (is_degraded_or_backfilling_object(obc->obs.oi.soid)) {
     callbacks_for_degraded_object[obc->obs.oi.soid].push_back(
       watch->get_delayed_cb()
@@ -8571,9 +8575,9 @@ void ReplicatedPG::mark_all_unfound_lost(int what)
   info.last_update.epoch = get_osdmap()->get_epoch();
   const pg_missing_t &missing = pg_log.get_missing();
   map<hobject_t, pg_missing_t::item>::const_iterator m =
-    missing_loc.get_all_missing().begin();
+    missing_loc.get_needs_recovery().begin();
   map<hobject_t, pg_missing_t::item>::const_iterator mend =
-    missing_loc.get_all_missing().end();
+    missing_loc.get_needs_recovery().end();
   while (m != mend) {
     const hobject_t &oid(m->first);
     if (!missing_loc.is_unfound(oid)) {
